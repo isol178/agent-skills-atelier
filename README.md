@@ -6,7 +6,7 @@ A personal collection of Claude agent skills — built for my own workflows, sha
 
 | Skill | Description |
 |-------|-------------|
-| (coming soon) | |
+| [roundtable](skills/roundtable/) | 円卓会議スキル — 多分野の専門家パネル + Devil's Advocate による構造化議論で、提案・設計・戦略を多角的に評価する |
 
 ## Usage
 
