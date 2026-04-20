@@ -22,3 +22,7 @@ skills/
 ## Notes
 
 These skills are written for my own context and may need adjustment for yours. No guarantees, but PRs and issues are welcome.
+
+## License
+
+MIT
