@@ -1,38 +1,40 @@
-# CLAUDE.md
+# Agent Skills Development Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agents when working with code in this repository.
 
 ## What this repo is
 
-A collection of Claude Code skills — reusable agent behaviors loaded by Claude Code from `.claude/skills/`. Each skill is a directory containing a `SKILL.md` (YAML frontmatter + markdown body) and optionally `references/` and `scripts/`.
+A collection of Agent skills — reusable agent behaviors shared across multiple agent harnesses (such as Claude Code and Gemini CLI).
+
+## Repository structure & Sync mechanism
+
+This repository uses a "Link-once, Sync-all" strategy for skill management:
+
+- **Source**: All skill definitions (logic, references, scripts) reside in the `skills/` directory.
+- **Claude Code**: Registered on a **per-skill basis** via individual symlinks in `.claude/skills/`.
+- **Gemini CLI**: Automatically synchronized via a **directory-level symlink** (`.gemini/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Gemini CLI.
 
 ## Adding a new skill
 
-1. Create `skills/<name>/SKILL.md` with the required frontmatter:
-   ```yaml
-   ---
-   name: <name>
-   description: >
-     <trigger description — this is what Claude uses to decide when to invoke the skill>
-   ---
-   ```
-2. Create a Git-tracked symlink so Claude Code loads it:
-   ```
+1. Create a new skill directory: `skills/<name>/SKILL.md`.
+2. Register the skill to `.claude/skills/` using a relative symlink:
+   ```bash
    ln -s ../../skills/<name> .claude/skills/<name>
    ```
-3. Add a one-line English description to the README table.
+3. (Verification) The skill is now automatically visible to Gemini CLI through the `.gemini/skills` directory link. No further action is required.
+4. Add a one-line English description to the README table.
 
-The symlink must use a relative path (`../../skills/<name>`, not an absolute path) so it resolves correctly after cloning.
+**Important**: Always use relative paths for symlinks to ensure they work correctly across different environments.
 
 ## Skill structure conventions
 
-- `SKILL.md` body: workflow instructions for the agent. The `description` frontmatter field controls when Claude triggers the skill — keep it precise and use concrete trigger phrases.
+- `SKILL.md` body: workflow instructions for the agent. The `description` frontmatter field controls when the agent triggers the skill — keep it precise and use concrete trigger phrases.
 - `references/`: supplementary docs the skill body tells the agent to read when needed. Not loaded automatically.
-- `scripts/`: helper Python scripts (e.g. score calculation, convergence checking). No package manager or build step required — run directly with `python scripts/<name>.py`.
+- `scripts/`: helper Python scripts (e.g. score calculation, convergence checking). Run directly with `python scripts/<name>.py`.
 
 ## Improving a skill's prompt quality
 
-Use the `empirical-prompt-tuning` skill: dispatch a fresh subagent to run the skill against 2–3 scenarios, collect both self-reported feedback (ambiguities, discretionary fills, retries) and measured metrics (success/fail on `[critical]` requirements, accuracy %, step count), then apply one-theme-per-iteration patches until convergence. Never self-review — always dispatch a new subagent.
+Use the `empirical-prompt-tuning` skill: dispatch a fresh agent session to run the skill against 2–3 scenarios, collect both self-reported feedback (ambiguities, discretionary fills, retries) and measured metrics (success/fail on `[critical]` requirements, accuracy %, step count), then apply one-theme-per-iteration patches until convergence. Always use an independent evaluator session for review.
 
 ## Repository conventions
 

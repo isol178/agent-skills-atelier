@@ -1,6 +1,6 @@
 # agent-skills-atelier
 
-A personal collection of Claude agent skills — built for my own workflows, shared in case they're useful to yours.
+A personal collection of AI agent skills — built for my own workflows, shared in case they're useful to yours. Compatible with **Claude Code** and **Gemini CLI**.
 
 ## Skills
 
@@ -13,14 +13,19 @@ A personal collection of Claude agent skills — built for my own workflows, sha
 
 ## Usage
 
-Each skill lives in its own directory under `skills/`. To use a skill, download the folder and install it via Claude's skill settings.
+Each skill lives in its own directory under `skills/`. This repository uses a symlink-based architecture to share skills across multiple agent harnesses.
 
+### Registration (Link-once, Sync-all)
+
+To enable a skill, create a relative symbolic link in the `.claude/skills/` directory.
+
+```bash
+# Example: Registering the 'roundtable' skill
+ln -s ../../skills/roundtable .claude/skills/roundtable
 ```
-skills/
-└── skill-name/
-    ├── SKILL.md
-    └── ...
-```
+
+- **Claude Code**: Loads skills directly from `.claude/skills/`.
+- **Gemini CLI**: Automatically picks up the same skills via a directory-level link (`.gemini/skills -> ../.claude/skills`).
 
 ## Notes
 
