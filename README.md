@@ -6,6 +6,7 @@ A personal collection of Claude agent skills — built for my own workflows, sha
 
 | Skill | Description |
 |-------|-------------|
+| [brag-refiner](skills/brag-refiner/) | Turn raw work logs and Brag Documents into impact-focused self-advocacy statements. Runs a short interview to surface Why, Impact, and Scope, then outputs polished entries for weekly check-ins or performance reviews. |
 | [claude-skills-symlinks](skills/claude-skills-symlinks/) | Create a Git-tracked symlink under `.claude/skills/` pointing to a skill directory elsewhere in the repo. Covers Windows-specific pitfalls (MSYS winsymlinks, Developer Mode, relative paths). |
 | [empirical-prompt-tuning](skills/empirical-prompt-tuning/) | Iteratively improve agent prompts (skills, slash commands, CLAUDE.md sections) by having an unbiased executor run them and scoring results from both sides until improvement plateaus. |
 | [roundtable](skills/roundtable/) | Convene a panel of domain experts + Devil's Advocate for structured multi-perspective evaluation of proposals, designs, and strategies. |
