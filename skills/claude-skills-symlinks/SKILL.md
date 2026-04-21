@@ -94,7 +94,7 @@ git ls-files -s .claude/skills/gcs-operator
 Some automated environments start a fresh shell for every command, so `export` set in one step doesn't survive into the next. **Claude Code's Bash tool always starts a fresh shell per invocation** — so when this skill is executed by a Claude Code agent, always use the one-liner form. Pass the env var inline and chain the commands into a single invocation:
 
 ```bash
-MSYS=winsymlinks:nativestrict bash -c 'cd .claude/skills && ln -s ../../<path-to-skill-source> <skill-name>'
+MSYS=winsymlinks:nativestrict bash -c 'mkdir -p .claude/skills && cd .claude/skills && ln -s ../../<path-to-skill-source> <skill-name>'
 ```
 
 Verification (`ls -la` and `git ls-files -s`) can be run as independent commands afterwards — they don't need the env var.
