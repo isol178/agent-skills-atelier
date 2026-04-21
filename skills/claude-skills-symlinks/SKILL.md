@@ -1,5 +1,5 @@
 ---
-name: claude-skills-symlink
+name: claude-skills-symlinks
 description: Create a Git-tracked symlink under `.claude/skills/` pointing to a skill directory elsewhere in the repo, so Claude Code loads the skill while Git records only the symlink (not duplicate files). Use whenever the user wants to expose a skill to Claude Code via a symlink, share skills across a repo, or reports that their symlink is being tracked as duplicate files by Git. Focused on the Windows-specific Git Bash pitfalls (MSYS winsymlinks, Developer Mode, relative paths) that cause `ln -s` to silently copy directories instead of linking. Also use when the user mentions `mklink`, `core.symlinks`, "symlink not working in Git", or "skill appears twice in Claude Code".
 ---
 
