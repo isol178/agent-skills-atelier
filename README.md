@@ -6,7 +6,8 @@ A personal collection of Claude agent skills — built for my own workflows, sha
 
 | Skill | Description |
 |-------|-------------|
-| [roundtable](skills/roundtable/) | 円卓会議スキル — 多分野の専門家パネル + Devil's Advocate による構造化議論で、提案・設計・戦略を多角的に評価する |
+| [claude-skills-symlinks](skills/claude-skills-symlinks/) | Create a Git-tracked symlink under `.claude/skills/` pointing to a skill directory elsewhere in the repo. Covers Windows-specific pitfalls (MSYS winsymlinks, Developer Mode, relative paths). |
+| [roundtable](skills/roundtable/) | Convene a panel of domain experts + Devil's Advocate for structured multi-perspective evaluation of proposals, designs, and strategies. |
 
 ## Usage
 
