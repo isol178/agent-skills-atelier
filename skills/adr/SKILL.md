@@ -96,19 +96,19 @@ ls docs/decisions/ | grep -E '^[0-9]{4}' | sort | tail -1
 ## 参考
 
 - 関連する spec / issue / PR
-- 関連する既存 ADR
+- 関連する既存 ADR（相対パスでリンク: `[NNNN](NNNN-slug.md)`）
 ```
 
 ### 4. 既存 ADR との整合 (Supersede Check)
 
-新しい判断が既存の ADR (例: `0005`) を覆す場合は以下を行う。
+新しい判断が既存の ADR (例: `0005-old-slug.md`) を覆す場合は以下を行う。
 
-1. **新 ADR**: `- **Supersedes**: 0005` という行をステータスの下に追加する。
-2. **旧 ADR**: ステータス行を `Superseded by NNNN` (新番号) に書き換える。
+1. **新 ADR**: `- **Supersedes**: [0005](0005-old-slug.md)` という行をステータスの下に追加する。
+2. **旧 ADR**: ステータス行を `Superseded by [NNNN](NNNN-new-slug.md)` (新番号と新ファイルへのリンク) に書き換える。
 
 **旧 ADR の更新例**:
 ```markdown
-- **ステータス**: Superseded by 0008
+- **ステータス**: Superseded by [0008](0008-new-slug.md)
 ```
 ※ 本文（過去の決定内容）は歴史的経緯として残すため、書き換えない。
 
