@@ -1,6 +1,6 @@
 # agent-skills-atelier
 
-A personal collection of AI agent skills — built for my own workflows, shared in case they're useful to yours. Compatible with **Claude Code** and **Gemini CLI**.
+A personal collection of AI agent skills — built for my own workflows, shared in case they're useful to yours. Compatible with **Claude Code**, **Gemini CLI**, and **Codex CLI**.
 
 ## Skills
 
@@ -27,6 +27,7 @@ ln -s ../../skills/roundtable .claude/skills/roundtable
 
 - **Claude Code**: Loads skills directly from `.claude/skills/`.
 - **Gemini CLI**: Automatically picks up the same skills via a directory-level link (`.gemini/skills -> ../.claude/skills`).
+- **Codex CLI**: Automatically picks up the same skills via a directory-level link (`.agents/skills -> ../.claude/skills`).
 
 ## Notes
 
