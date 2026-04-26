@@ -13,6 +13,7 @@ This repository uses a "Link-once, Sync-all" strategy for skill management:
 - **Source**: All skill definitions (logic, references, scripts) reside in the `skills/` directory.
 - **Claude Code**: Registered on a **per-skill basis** via individual symlinks in `.claude/skills/`.
 - **Gemini CLI**: Automatically synchronized via a **directory-level symlink** (`.gemini/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Gemini CLI.
+- **Codex CLI**: Automatically synchronized via a **directory-level symlink** (`.agents/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Codex CLI.
 
 ## Adding a new skill
 
@@ -21,7 +22,7 @@ This repository uses a "Link-once, Sync-all" strategy for skill management:
    ```bash
    ln -s ../../skills/<name> .claude/skills/<name>
    ```
-3. (Verification) The skill is now automatically visible to Gemini CLI through the `.gemini/skills` directory link. No further action is required.
+3. (Verification) The skill is now automatically visible to Gemini CLI and Codex CLI through the directory-level links. No further action is required.
 4. Add a one-line English description to the README table.
 
 **Important**: Always use relative paths for symlinks to ensure they work correctly across different environments.
