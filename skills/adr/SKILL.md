@@ -45,21 +45,24 @@ description: 非自明な技術選定やアーキテクチャ設計の決定を 
 ### 2. 次の番号の特定 (Next Number Check)
 
 ```bash
+mkdir -p docs/decisions
 ls docs/decisions/ | grep -E '^[0-9]{4}' | sort | tail -1
 ```
-※ ディレクトリが存在しない場合は `mkdir -p docs/decisions` を行う。
 ※ ファイルがない場合は `0001` から開始する。
 
 ### 3. ADR ファイルの作成 (Drafting)
 
 `docs/decisions/NNNN-<slug>.md` を以下のテンプレートで作成する。
-`<slug>` は英小文字とハイフンのみを使用し、簡潔なタイトルにする。
+- **<slug>**: タイトルを簡潔な英小文字とハイフンで繋げたもの（例: `use-tailwind-css`）。
+- **ステータス**: 
+    - 通常は `Accepted`（決定済み）とする。
+    - 複数の案からユーザーに選んでもらう段階では `Proposed` とする。
 
 ```markdown
 # NNNN. <タイトル>
 
 - **日付**: YYYY-MM-DD
-- **ステータス**: Proposed | Accepted | Superseded by NNNN
+- **ステータス**: Accepted
 - **決定者**: [Agent Name] (via Gemini CLI / Claude Code)
 
 ## コンテキスト
@@ -100,9 +103,14 @@ ls docs/decisions/ | grep -E '^[0-9]{4}' | sort | tail -1
 
 新しい判断が既存の ADR (例: `0005`) を覆す場合は以下を行う。
 
-1. **新 ADR**: `Supersedes: 0005` という行をヘッダー付近に追加する。
-2. **旧 ADR**: ステータスを `Superseded by NNNN` (新番号) に更新する。
-   - **注意**: 旧 ADR の本文（過去の決定内容）は書き換えない。ステータスのみを更新する。
+1. **新 ADR**: `- **Supersedes**: 0005` という行をステータスの下に追加する。
+2. **旧 ADR**: ステータス行を `Superseded by NNNN` (新番号) に書き換える。
+
+**旧 ADR の更新例**:
+```markdown
+- **ステータス**: Superseded by 0008
+```
+※ 本文（過去の決定内容）は歴史的経緯として残すため、書き換えない。
 
 ### 5. ユーザーへの提示と完了
 
