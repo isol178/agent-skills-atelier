@@ -58,7 +58,7 @@ ADR を書くべきかは、たった一つの問いで決まる:
 
 1. このコードを6ヶ月後の自分が見て、why を即座に説明できるか?
 2. 新メンバーがこのコードを読んで、別の "自然な" 書き方に改善しようとしないか?
-3. どのシグナル(S1〜S6)に該当するか?
+3. どのシグナル(S1〜S6)に該当するか? (複数該当する場合はすべて列挙し、`--signals` に渡す)
 
 1 が Yes かつ 2 が No なら起票不要。それ以外なら次へ。
 
@@ -74,11 +74,25 @@ ADR を書くべきかは、たった一つの問いで決まる:
 
 ### 3. 新規 ADR の作成
 
-採番とテンプレ展開はスクリプトで自動化する:
+採番とテンプレ展開はスクリプトで自動化する。**プロジェクトルートを作業ディレクトリ**にして実行する（`docs/decisions/` はここに作成される）。スクリプトは本スキルに付属しており、`SKILL.md` があるディレクトリ（例: `.claude/skills/adr`）を `<skill-dir>` として絶対パスで実行する:
 
 ```bash
-python scripts/new_adr.py "use-iam-db-auth"
+python <skill-dir>/scripts/new_adr.py "use-iam-db-auth" \
+  --title "Use IAM authentication for DB access" \
+  --signals "S1,S2" \
+  --decision-makers "Haruki, Agent (via Claude Code)"
 ```
+
+スクリプトファイルを Read する必要はない — 以下のオプション一覧でスクリプトの動作は完結する:
+
+| オプション | 既定値 | 説明 |
+|---|---|---|
+| `--title` | slug から自動生成（品質が低い） | **必ず明示する**。現在形の動詞＋ドメイン用語 |
+| `--signals` | `""` | 判定軸チェックで特定したシグナル番号（カンマ区切り） |
+| `--decision-makers` | `"Agent (via Claude Code)"` | 判断者（ユーザー名が分かれば追記する） |
+| `--decisions-dir` | `docs/decisions` | ADR の格納先（デフォルトで十分） |
+| `--status` | `accepted` | `proposed` / `rejected` / `deprecated` も指定可 |
+| `--supersedes` | なし | 既存 ADR を上書きする場合の旧 ADR 番号（整数） |
 
 これは次の番号(`NNNN`)を特定し、`docs/decisions/NNNN-use-iam-db-auth.md` に MADR 4.0.0 テンプレート(`assets/adr-template.md`)を展開する。
 
@@ -93,10 +107,10 @@ python scripts/new_adr.py "use-iam-db-auth"
 
 ### 5. 品質ゲート
 
-提出前に検証スクリプトを実行する:
+提出前に検証スクリプトを実行する（プロジェクトルートから実行）:
 
 ```bash
-python scripts/validate_adr.py docs/decisions/NNNN-use-iam-db-auth.md
+python <skill-dir>/scripts/validate_adr.py docs/decisions/NNNN-use-iam-db-auth.md
 ```
 
 このスクリプトは以下を機械的にチェックする:
@@ -105,6 +119,13 @@ python scripts/validate_adr.py docs/decisions/NNNN-use-iam-db-auth.md
 - Considered Options が最低2項目
 - Consequences に "Bad, because" が最低1項目
 - タイトル行の存在と整形
+
+以下は **error ではなく warning** として報告される（スクリプトは exit 0 で通過するが、本スキルでは **記述を強く推奨する**）:
+- 起票シグナルコメント（`<!-- 起票シグナル: ... -->`）
+- Confirmation セクション
+- More Information に Confidence の記載
+
+warning が残っている場合はドラフトに戻って追記する。`python <skill-dir>/scripts/validate_adr.py --strict` が通ることを品質の目安とする。
 
 機械的にチェックできない品質基準(出所の妥当性、Confirmation の実効性、inverted pyramid 文体)は人間/エージェントの目視確認による。チェックリストは `references/madr-template.md` の末尾にある。
 
