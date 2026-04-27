@@ -116,9 +116,12 @@ python <skill-dir>/scripts/validate_adr.py docs/decisions/NNNN-use-iam-db-auth.m
 このスクリプトは以下を機械的にチェックする:
 - front matter の妥当性(`status`, `date`, `decision-makers` 必須)
 - 必須セクションの存在(Context and Problem Statement / Decision Drivers / Considered Options / Decision Outcome / Consequences)
-- Considered Options が最低2項目
-- Consequences に "Bad, because" が最低1項目
 - タイトル行の存在と整形
+- Context and Problem Statement が空でない
+- Decision Drivers にプレースホルダーでない項目が最低1項目
+- Considered Options が最低2項目
+- Decision Outcome にプレースホルダーが残っていない
+- Consequences に "Bad, because" が最低1項目
 
 以下は **error ではなく warning** として報告される（スクリプトは exit 0 で通過するが、本スキルでは **記述を強く推奨する**）:
 - 起票シグナルコメント（`<!-- 起票シグナル: ... -->`）
