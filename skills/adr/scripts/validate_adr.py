@@ -265,6 +265,20 @@ def validate_quality_gates(body: str) -> list[Issue]:
             )
         )
 
+    # Decision Drivers に最低1項目
+    drivers = extract_section(body, "Decision Drivers")
+    if count_list_items(drivers) < 1:
+        issues.append(
+            Issue("error", "Decision Drivers が空またはプレースホルダーのみ(最低1項目必要)")
+        )
+
+    # Decision Outcome にプレースホルダーが残っていない
+    outcome = extract_section(body, "Decision Outcome")
+    if re.search(r'\{[A-Z_0-9]+\}', outcome):
+        issues.append(
+            Issue("error", "Decision Outcome にプレースホルダーが残っている")
+        )
+
     # More Information に Confidence の記載(警告)
     more_info = extract_section(body, "More Information")
     if more_info and not re.search(r"\*\*Confidence\*\*\s*:", more_info):

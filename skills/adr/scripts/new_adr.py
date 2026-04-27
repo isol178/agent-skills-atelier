@@ -79,10 +79,13 @@ def render_template(
     rendered = rendered.replace("{SIGNALS}", signals or "未指定")
 
     # supersedes が指定されたら front matter に挿入
+    # \n---\n の最初の出現 = front matter の閉じ区切り（先頭の --- には前の \n がないため）
     if supersedes is not None:
-        rendered = rendered.replace(
-            "informed: []\n---",
-            f"informed: []\nsupersedes: {supersedes:04d}\n---",
+        rendered = re.sub(
+            r'\n(---)\n',
+            f'\nsupersedes: {supersedes:04d}\n\\1\n',
+            rendered,
+            count=1,
         )
 
     return rendered
@@ -107,9 +110,9 @@ def update_superseded_adr(decisions_dir: Path, old_number: int, new_number: int)
     content = target.read_text(encoding="utf-8")
     new_status = f'"superseded by {new_number:04d}"'
 
-    # front matter 内の status: "..." を置換
+    # front matter 内の status を置換（ダブルクォート・シングルクォート・クォートなし を許容）
     new_content, n_replacements = re.subn(
-        r'^status:\s*"[^"]*"',
+        r'^status:\s*["\']?[^"\']*["\']?',
         f"status: {new_status}",
         content,
         count=1,
