@@ -35,14 +35,24 @@ from pathlib import Path
 # 分割シミュレーション（split.py と共通ロジック）
 # ──────────────────────────────────────────
 
+
 def parse_sections(content: str, level: int) -> list[dict]:
     prefix = "#" * level + " "
     sections = []
     current: dict | None = None
     preamble_lines: list[str] = []
 
+    in_code_block = False
+
     for line in content.splitlines(keepends=True):
-        if line.startswith(prefix) and not line.startswith(prefix + "#"):
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_code_block = not in_code_block
+        if (
+            not in_code_block
+            and line.startswith(prefix)
+            and not line.startswith(prefix + "#")
+        ):
             if current is None and preamble_lines:
                 sections.append({"heading": "_preamble", "lines": preamble_lines})
                 preamble_lines = []
@@ -65,6 +75,7 @@ def parse_sections(content: str, level: int) -> list[dict]:
 # ──────────────────────────────────────────
 # 品質チェック
 # ──────────────────────────────────────────
+
 
 def check_quality(sections: list[dict]) -> list[tuple[str, str]]:
     """
@@ -89,7 +100,9 @@ def check_quality(sections: list[dict]) -> list[tuple[str, str]]:
 
     tiny = sum(1 for n in line_counts if n < 10)
     if count > 0 and tiny / count >= 0.5:
-        results.append(("[WARN]", f"節の{tiny}/{count}個が10行未満 → レベルを1段上げることを推奨"))
+        results.append(
+            ("[WARN]", f"節の{tiny}/{count}個が10行未満 → レベルを1段上げることを推奨")
+        )
     else:
         results.append(("[OK]", f"10行未満の節: {tiny}/{count}個"))
 
@@ -103,6 +116,7 @@ def check_quality(sections: list[dict]) -> list[tuple[str, str]]:
 # ──────────────────────────────────────────
 # 独立性リスク検出
 # ──────────────────────────────────────────
+
 
 def detect_cross_refs(sections: list[dict]) -> list[dict]:
     """
@@ -139,12 +153,14 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
 
             for pattern, reason in relative_patterns:
                 if re.search(pattern, stripped):
-                    risks.append({
-                        "section": section["heading"],
-                        "line_no": i,
-                        "line": stripped[:100],
-                        "reason": reason,
-                    })
+                    risks.append(
+                        {
+                            "section": section["heading"],
+                            "line_no": i,
+                            "line": stripped[:100],
+                            "reason": reason,
+                        }
+                    )
                     break  # 1行につき1件
 
             # 他節の見出しテキストへの言及（10文字以上のもの）
@@ -152,12 +168,14 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
                 if other_heading == section["heading"]:
                     continue
                 if len(other_heading) >= 10 and other_heading in stripped:
-                    risks.append({
-                        "section": section["heading"],
-                        "line_no": i,
-                        "line": stripped[:100],
-                        "reason": f"他節「{other_heading[:30]}」への言及",
-                    })
+                    risks.append(
+                        {
+                            "section": section["heading"],
+                            "line_no": i,
+                            "line": stripped[:100],
+                            "reason": f"他節「{other_heading[:30]}」への言及",
+                        }
+                    )
                     break
 
     return risks
@@ -167,6 +185,7 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
 # レポート出力
 # ──────────────────────────────────────────
 
+
 def report_level(content: str, level: int, source_name: str) -> bool:
     """
     指定レベルの見積もりレポートを表示する。
@@ -175,9 +194,9 @@ def report_level(content: str, level: int, source_name: str) -> bool:
     sections = parse_sections(content, level)
     content_sections = [s for s in sections if s["heading"] != "_preamble"]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  H{level} 分割見積もり — {source_name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     if not content_sections:
         print(f"  （H{level} の見出しが存在しません）")
@@ -224,17 +243,21 @@ def report_level(content: str, level: int, source_name: str) -> bool:
 
 def report_all_levels(content: str, source_name: str) -> None:
     """H1〜H4 の全レベルを比較表示する。"""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  全レベル比較 — {source_name}")
-    print(f"{'='*60}")
-    print(f"\n  {'レベル':<8} {'節数':>4}  {'最小行':>6}  {'最大行':>6}  {'平均行':>6}  警告")
-    print(f"  {'-'*55}")
+    print(f"{'=' * 60}")
+    print(
+        f"\n  {'レベル':<8} {'節数':>4}  {'最小行':>6}  {'最大行':>6}  {'平均行':>6}  警告"
+    )
+    print(f"  {'-' * 55}")
 
     for level in range(1, 5):
         sections = parse_sections(content, level)
         content_sections = [s for s in sections if s["heading"] != "_preamble"]
         if not content_sections:
-            print(f"  H{level}        {'—':>4}  {'—':>6}  {'—':>6}  {'—':>6}  (見出しなし)")
+            print(
+                f"  H{level}        {'—':>4}  {'—':>6}  {'—':>6}  {'—':>6}  (見出しなし)"
+            )
             continue
 
         line_counts = [len(s["lines"]) for s in content_sections]
@@ -247,7 +270,7 @@ def report_all_levels(content: str, source_name: str) -> None:
             f"{len(content_sections):>8}  "
             f"{min(line_counts):>6}  "
             f"{max(line_counts):>6}  "
-            f"{sum(line_counts)//len(line_counts):>6}  "
+            f"{sum(line_counts) // len(line_counts):>6}  "
             f"{warn_str}"
         )
 
@@ -258,11 +281,16 @@ def report_all_levels(content: str, source_name: str) -> None:
 # エントリポイント
 # ──────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Markdown分割の見積もりと品質チェック")
     parser.add_argument("file", help="対象のMarkdownファイルパス")
-    parser.add_argument("--level", type=int, default=2, help="見積もりする見出しレベル（デフォルト: 2）")
-    parser.add_argument("--all-levels", action="store_true", help="H1〜H4の全レベルを比較表示")
+    parser.add_argument(
+        "--level", type=int, default=2, help="見積もりする見出しレベル（デフォルト: 2）"
+    )
+    parser.add_argument(
+        "--all-levels", action="store_true", help="H1〜H4の全レベルを比較表示"
+    )
     args = parser.parse_args()
 
     source = Path(args.file)
@@ -274,11 +302,15 @@ def main() -> None:
 
     if args.all_levels:
         report_all_levels(content, source.name)
-        print(f"\n  次のステップ: python scripts/estimate.py {source} --level <N> で詳細確認")
+        print(
+            f"\n  次のステップ: python scripts/estimate.py {source} --level <N> で詳細確認"
+        )
     else:
         ok = report_level(content, args.level, source.name)
         if ok:
-            print(f"\n  次のステップ: python scripts/split.py {source} --level {args.level}")
+            print(
+                f"\n  次のステップ: python scripts/split.py {source} --level {args.level}"
+            )
         else:
             print(f"\n  警告あり。--all-levels で他のレベルも確認することを推奨。")
             print(f"  強制実行: python scripts/split.py {source} --level {args.level}")

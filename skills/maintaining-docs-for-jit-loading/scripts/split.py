@@ -82,8 +82,17 @@ def parse_sections(content: str, level: int) -> list[dict]:
     current: dict | None = None
     preamble_lines: list[str] = []
 
+    in_code_block = False
+
     for line in content.splitlines(keepends=True):
-        if line.startswith(prefix) and not line.startswith(prefix + "#"):
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_code_block = not in_code_block
+        if (
+            not in_code_block
+            and line.startswith(prefix)
+            and not line.startswith(prefix + "#")
+        ):
             # 新しい節の開始
             if current is None and preamble_lines:
                 # 最初の見出しより前の内容をpreambleとして記録
