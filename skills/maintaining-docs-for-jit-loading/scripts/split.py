@@ -116,40 +116,6 @@ def parse_sections(content: str, level: int) -> list[dict]:
     return sections
 
 
-def check_split_quality(sections: list[dict]) -> list[str]:
-    """
-    分割品質をチェックして警告メッセージリストを返す。
-    空の警告リストなら問題なし。
-    """
-    warnings = []
-    content_sections = [s for s in sections if s["heading"] != "_preamble"]
-
-    count = len(content_sections)
-    if count <= 2:
-        warnings.append(
-            f"[WARN]  節数が{count}個と少ない。より細かい見出しレベルでの分割を検討してください。"
-        )
-    if count >= 30:
-        warnings.append(
-            f"[WARN]  節数が{count}個と多すぎる。より粗い見出しレベルでの分割を検討してください。"
-        )
-
-    line_counts = [len(s["lines"]) for s in content_sections]
-    tiny = sum(1 for n in line_counts if n < 10)
-    if count > 0 and tiny / count >= 0.5:
-        warnings.append(
-            f"[WARN]  節の{tiny}/{count}個が10行未満。分割レベルを1段上げることを検討してください。"
-        )
-
-    large = [s["heading"] for s in content_sections if len(s["lines"]) > 300]
-    for h in large:
-        warnings.append(
-            f"[INFO]  節「{h}」は300行超。参照時のトークン量に注意してください。"
-        )
-
-    return warnings
-
-
 # ──────────────────────────────────────────
 # ファイル書き出し
 # ──────────────────────────────────────────

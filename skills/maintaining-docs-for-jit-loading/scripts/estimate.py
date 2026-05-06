@@ -39,9 +39,13 @@ def parse_sections(content: str, level: int) -> list[dict]:
     prefix = "#" * level + " "
     sections = []
     current: dict | None = None
+    preamble_lines: list[str] = []
 
     for line in content.splitlines(keepends=True):
         if line.startswith(prefix) and not line.startswith(prefix + "#"):
+            if current is None and preamble_lines:
+                sections.append({"heading": "_preamble", "lines": preamble_lines})
+                preamble_lines = []
             if current is not None:
                 sections.append(current)
             heading_text = line.lstrip("#").strip().rstrip("\n")
@@ -50,9 +54,7 @@ def parse_sections(content: str, level: int) -> list[dict]:
             if current is not None:
                 current["lines"].append(line)
             elif not sections:
-                sections.append({"heading": "_preamble", "lines": [line]})
-                current = None
-                continue
+                preamble_lines.append(line)
 
     if current is not None:
         sections.append(current)
@@ -125,7 +127,7 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
         (r"上記|前述|前節|前章", "上位/前への相対参照"),
         (r"以下|後述|後節|後章|次節|次章", "下位/後への相対参照"),
         (r"§\s*\d+|第\s*\d+\s*[節章条項]", "節番号による直接参照"),
-        (r"\(\s*[再参照|参照]\s*\)", "再参照マーカー"),
+        (r"\(\s*(?:再参照|参照)\s*\)", "再参照マーカー"),
     ]
 
     risks = []
@@ -145,7 +147,7 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
                     })
                     break  # 1行につき1件
 
-            # 他節の見出しテキストへの言及（20文字以上のもの）
+            # 他節の見出しテキストへの言及（10文字以上のもの）
             for other_heading in heading_texts:
                 if other_heading == section["heading"]:
                     continue
