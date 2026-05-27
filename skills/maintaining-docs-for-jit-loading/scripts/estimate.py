@@ -43,11 +43,17 @@ def parse_sections(content: str, level: int) -> list[dict]:
     preamble_lines: list[str] = []
 
     in_code_block = False
+    fence_char = ""
 
     for line in content.splitlines(keepends=True):
         stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_code_block = not in_code_block
+        if not in_code_block:
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                in_code_block = True
+                fence_char = stripped[:3]
+        elif stripped.startswith(fence_char):
+            in_code_block = False
+            fence_char = ""
         if (
             not in_code_block
             and line.startswith(prefix)
@@ -146,9 +152,18 @@ def detect_cross_refs(sections: list[dict]) -> list[dict]:
 
     risks = []
     for section in content_sections:
+        in_code_block = False
+        fence_char = ""
         for i, line in enumerate(section["lines"], start=1):
             stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
+            if not in_code_block:
+                if stripped.startswith("```") or stripped.startswith("~~~"):
+                    in_code_block = True
+                    fence_char = stripped[:3]
+            elif stripped.startswith(fence_char):
+                in_code_block = False
+                fence_char = ""
+            if not stripped or stripped.startswith("#") or in_code_block:
                 continue
 
             for pattern, reason in relative_patterns:
