@@ -7,6 +7,7 @@ A personal collection of AI agent skills — built for my own workflows, shared 
 | Skill | Description |
 |-------|-------------|
 | [adr](skills/adr/) | Capture the *why* behind non-trivial technical decisions as MADR 4.0.0 Architecture Decision Records — detects decision signals (S1–S6), guides drafting with context/alternatives/trade-offs, and validates each ADR before commit. |
+| [azure-devops-pr](skills/azure-devops-pr/) | Operate Azure DevOps Pull Requests via `az repos pr` and REST API — create, list, inspect, comment/thread, add reviewers, vote, link Work Items, and update PR metadata. |
 | [brag-refiner](skills/brag-refiner/) | Turn raw work logs and Brag Documents into impact-focused self-advocacy statements. Runs a short interview to surface Why, Impact, and Scope, then outputs polished entries for weekly check-ins or performance reviews. |
 | [claude-skills-symlinks](skills/claude-skills-symlinks/) | Create a Git-tracked symlink under `.claude/skills/` pointing to a skill directory elsewhere in the repo. Covers Windows-specific pitfalls (MSYS winsymlinks, Developer Mode, relative paths). |
 | [empirical-prompt-tuning](skills/empirical-prompt-tuning/) | Iteratively improve agent prompts (skills, slash commands, CLAUDE.md sections) by having an unbiased executor run them and scoring results from both sides until improvement plateaus. |
