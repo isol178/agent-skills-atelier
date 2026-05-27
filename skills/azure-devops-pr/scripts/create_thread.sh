@@ -124,7 +124,7 @@ else
       --arg status "$STATUS" \
       '{
         comments: [{parentCommentId: 0, content: $content, commentType: 1}],
-        status: ($status|tonumber),
+        status: (try ($status|tonumber) catch $status),
         threadContext: {
           filePath: $file,
           rightFileStart: {line: ($line|tonumber), offset: 1},
@@ -138,7 +138,7 @@ else
       --arg status "$STATUS" \
       '{
         comments: [{parentCommentId: 0, content: $content, commentType: 1}],
-        status: ($status|tonumber)
+        status: (try ($status|tonumber) catch $status)
       }')
   fi
 
