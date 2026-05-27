@@ -82,20 +82,23 @@ def parse_sections(content: str, level: int) -> list[dict]:
     current: dict | None = None
     preamble_lines: list[str] = []
 
-    in_code_block = False
-    fence_char = ""
+    fence_char = None
+    fence_len = 0
 
     for line in content.splitlines(keepends=True):
         stripped = line.strip()
-        if not in_code_block:
-            if stripped.startswith("```") or stripped.startswith("~~~"):
-                in_code_block = True
-                fence_char = stripped[:3]
-        elif stripped.startswith(fence_char):
-            in_code_block = False
-            fence_char = ""
+        if fence_char:
+            if stripped.startswith(fence_char * fence_len) and all(c == fence_char for c in stripped):
+                fence_char = None
+                fence_len = 0
+        else:
+            for char in ("`", "~"):
+                if stripped.startswith(char * 3):
+                    fence_char = char
+                    fence_len = len(stripped) - len(stripped.lstrip(char))
+                    break
         if (
-            not in_code_block
+            not fence_char
             and line.startswith(prefix)
             and not line.startswith(prefix + "#")
         ):
