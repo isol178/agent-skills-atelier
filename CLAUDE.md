@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## What this repo is
 
-A collection of Agent skills — reusable agent behaviors shared across multiple agent harnesses (such as Claude Code and Antigaravity CLI).
+A collection of Agent skills — reusable agent behaviors shared across multiple agent harnesses (such as Claude Code and Antigravity CLI).
 
 ## Repository structure & Sync mechanism
 
@@ -12,7 +12,7 @@ This repository uses a "Link-once, Sync-all" strategy for skill management:
 
 - **Source**: All skill definitions (logic, references, scripts) reside in the `skills/` directory.
 - **Claude Code**: Registered on a **per-skill basis** via individual symlinks in `.claude/skills/`.
-- **Antigaravity CLI**: Automatically synchronized via a **directory-level symlink** (`.agents/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Antigaravity CLI.
+- **Antigravity CLI**: Automatically synchronized via a **directory-level symlink** (`.agents/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Antigravity CLI.
 - **Codex CLI**: Automatically synchronized via a **directory-level symlink** (`.agents/skills -> ../.claude/skills`), ensuring any skill added to Claude Code is instantly available to Codex CLI.
 
 ## Adding a new skill
@@ -22,7 +22,7 @@ This repository uses a "Link-once, Sync-all" strategy for skill management:
    ```bash
    ln -s ../../skills/<name> .claude/skills/<name>
    ```
-3. (Verification) The skill is now automatically visible to Antigaravity CLI and Codex CLI through the directory-level links. No further action is required.
+3. (Verification) The skill is now automatically visible to Antigravity CLI and Codex CLI through the directory-level links. No further action is required.
 4. Add a one-line English description to the README table.
 
 **Important**: Always use relative paths for symlinks to ensure they work correctly across different environments.
