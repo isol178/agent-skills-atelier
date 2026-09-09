@@ -17,6 +17,7 @@ A personal collection of AI agent skills — built for my own workflows, shared 
 | [maintaining-docs-for-jit-loading](skills/maintaining-docs-for-jit-loading/) | Split large Markdown documents into per-section files with an INDEX.md for JIT (Just-In-Time) loading, or merge them back for review or LLM input. |
 | [pattern-anchoring](skills/pattern-anchoring/) | Before creating new files (component, route, model, repository, test…), identify the 2–3 nearest existing files as anchors and follow this codebase's own structure and idioms instead of generic training-data patterns, reporting which files were referenced. |
 | [roundtable](skills/roundtable/) | Convene a panel of domain experts + Devil's Advocate for structured multi-perspective evaluation of proposals, designs, and strategies. |
+| [sanitize-artifacts](skills/sanitize-artifacts/) | Revise generated artifacts so they read as natural, standalone deliverables — strip leaked prompt instructions, conversation history, implementation constraints, and production-process residue. Adapted from [kotek-7/dotfiles](https://github.com/kotek-7/dotfiles/blob/main/dot_agents/skills/sanitize-artifacts/SKILL.md). |
 | [systematic-debugging](skills/systematic-debugging/) | Thinking protocol for non-obvious bugs — check known traps, separate observation from speculation, maintain a hypothesis ledger, run minimal discriminating experiments, and bisect by layer, instead of shotgun debugging. |
 
 ## Usage
