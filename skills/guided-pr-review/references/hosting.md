@@ -54,7 +54,7 @@ gh pr comment <N> --body-file comment.md
 
 ## Azure DevOps（`az repos pr` / `az devops invoke`）
 
-`azure-devops-pr` skill が使えるなら、そちらの `references/pr-comment-thread.md` と `scripts/create_thread.sh` を使う。以下は要点だけ。
+`az repos pr` にはコメント・スレッドのサブコマンドが無い。既存スレッドの取得と投稿は、`az devops invoke` で REST API（`pullRequestThreads` / `pullRequestThreadComments`）を呼ぶ。
 
 ```bash
 # PR の特定
@@ -67,10 +67,42 @@ git fetch origin <source>                  # 取れなければ PR 用 ref を�
 git fetch origin refs/pull/<N>/merge       # PR 用 ref はマージ commit。source 側は FETCH_HEAD^2
 ```
 
-- 既存スレッド: `az devops invoke --area git --resource pullRequestThreads` で取得する。システムが作るスレッド（commit の push 通知など）は、コメントの `commentType` が `text` のものだけに絞って除く。解決状態はスレッドの `status`（`active` / `fixed` / `closed` など）で判断する
-- 行コメント: `threadContext.rightFileStart` / `rightFileEnd` が PR SHA 側の行。`create_thread.sh --file <path> --line <line>` はこれを組み立てる
-- 返信: `create_thread.sh --thread-id <id> --parent-comment-id <id>`
+```bash
+# project と repositoryId は PR から取れる
+az repos pr show --id <N> --query "{project:repository.project.name, repo:repository.id}"
+
+# 既存スレッド
+az devops invoke --area git --resource pullRequestThreads \
+  --route-parameters project=<project> repositoryId=<repo> pullRequestId=<N> \
+  --http-method GET --api-version 7.1 --output json
+```
+
+- システムが作るスレッド（commit の push 通知など）は、コメントの `commentType` が `text`（数値なら `1`）のものだけに絞って除く。解決状態はスレッドの `status`（`active` / `fixed` / `closed` など。数値で返ることもある）で判断する
+
+投稿（本文は `jq --arg` で JSON に組み立ててファイルに書き、`--in-file` で渡すと、改行や引用符で崩れない）:
+
+```bash
+# 行コメント（新しいスレッド）。rightFile* が PR SHA 側の行。filePath は先頭に / を付ける
+jq -n --arg c "$(cat comment.md)" --arg f "/<path>" --argjson l <line> \
+  '{comments:[{parentCommentId:0,content:$c,commentType:1}],status:1,
+    threadContext:{filePath:$f,rightFileStart:{line:$l,offset:1},rightFileEnd:{line:$l,offset:200}}}' \
+  > body.json
+az devops invoke --area git --resource pullRequestThreads \
+  --route-parameters project=<project> repositoryId=<repo> pullRequestId=<N> \
+  --http-method POST --in-file body.json --api-version 7.1
+
+# PR 全体へのコメント: 上の body から threadContext を外す
+
+# 既存スレッドへの返信。parentCommentId は返信先のコメント ID（スレッドの先頭は通常 1）
+jq -n --arg c "$(cat reply.md)" '{parentCommentId:1,content:$c,commentType:1}' > body.json
+az devops invoke --area git --resource pullRequestThreadComments \
+  --route-parameters project=<project> repositoryId=<repo> pullRequestId=<N> threadId=<thread_id> \
+  --http-method POST --in-file body.json --api-version 7.1
+```
+
+- 投稿が成功すると、作成されたスレッド / コメントの JSON が返る。`id` が thread ID / comment ID
 - Windows では az CLI の前に `export PYTHONUTF8=1 PYTHONIOENCODING=utf-8` を付けないと、日本語が文字化けすることがある。一時ファイルは `/tmp` ではなく `$TEMP` かスクラッチパッドに置く
+- Windows の Git Bash では、`/` で始まる引数（`filePath` など）がパス変換で `C:/Program Files/Git/...` に化けることがある。`jq` の前に `MSYS_NO_PATHCONV=1` を付ける
 
 ## GitLab（`glab`）
 

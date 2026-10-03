@@ -1,6 +1,6 @@
 ---
 name: azure-devops-pr
-description: Azure DevOps の Pull Request を Azure CLI (az repos pr) と REST API で操作するスキル。PR の作成・一覧・詳細取得・検索・コメント/スレッド追加・レビュアー操作・投票・Work Item 紐付け・タイトル/説明更新などをカバーする。ユーザーが「PR 作って」「プルリク出して」「az repos pr で…」「Azure DevOps の PR にコメント」「レビューコメント残して」「この PR の一覧見せて」「自分が出した PR」「レビュアーになってる PR」「PR をマージできる状態にして」のような発話をした時、またはカレントディレクトリが Azure DevOps リポジトリ（remote が dev.azure.com / visualstudio.com / 社内 Azure DevOps Server）の git リポジトリで PR まわりの作業をしているときに必ず使う。git のブランチ作成・コミット・プッシュは対象外（人間がやる前提）。guided-pr-review skill が使える環境では、PR のレビューをユーザーと一緒に進める（何を指摘するか整理し、文面を決める）ときはそちらを主に使い、このスキルは操作方法の参照に使う。guided-pr-review が無ければ、このスキルだけでコメント・スレッド操作を行ってよい。
+description: Azure DevOps の Pull Request を Azure CLI (az repos pr) と REST API で操作するスキル。PR の作成・一覧・詳細取得・検索・コメント/スレッド追加・レビュアー操作・投票・Work Item 紐付け・タイトル/説明更新などをカバーする。ユーザーが「PR 作って」「プルリク出して」「az repos pr で…」「Azure DevOps の PR にコメント」「レビューコメント残して」「この PR の一覧見せて」「自分が出した PR」「レビュアーになってる PR」「PR をマージできる状態にして」のような発話をした時、またはカレントディレクトリが Azure DevOps リポジトリ（remote が dev.azure.com / visualstudio.com / 社内 Azure DevOps Server）の git リポジトリで PR まわりの作業をしているときに必ず使う。git のブランチ作成・コミット・プッシュは対象外（人間がやる前提）。
 ---
 
 # azure-devops-pr
