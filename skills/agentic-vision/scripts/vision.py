@@ -204,16 +204,45 @@ def label_fmt(step: float) -> str:
 
 
 # ------------------------------------------------------------------ コマンド
-def cmd_init(args):
-    ws = ws_dir(args)
-    ws.mkdir(parents=True, exist_ok=True)
-    src = Image.open(args.image)
+def load_image(path: str) -> tuple[Image.Image, int | None, list[str]]:
+    """画像を RGB で読む。(画像, EXIF の向き, 注意書き) を返す。
+    透過画像は白背景に合成する (そのまま RGB にすると透明部分が黒くなるため)。
+    アニメーションは最初のフレームだけを使う。HEIC/HEIF は pillow-heif があれば読める。"""
+    notes: list[str] = []
+    try:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except ImportError:
+        pass
+    try:
+        src = Image.open(path)
+    except Exception as e:  # noqa: BLE001
+        hint = ""
+        if Path(path).suffix.lower() in (".heic", ".heif"):
+            hint = " HEIC/HEIF は `pip install pillow-heif` を入れると開ける。"
+        elif Path(path).suffix.lower() in (".pdf", ".svg"):
+            hint = " PDF/SVG は非対応。PNG などに書き出してから渡す。"
+        die(f"画像を開けません: {path} ({e}).{hint}")
     exif_orient = None
     try:
         exif_orient = src.getexif().get(0x0112)
     except Exception:  # noqa: BLE001
         pass
-    img = ImageOps.exif_transpose(src).convert("RGB")
+    if getattr(src, "n_frames", 1) > 1:
+        notes.append(f"{src.n_frames} フレームのアニメーションなので最初のフレームだけを使う。")
+    img = ImageOps.exif_transpose(src)
+    if "A" in img.getbands() or "transparency" in img.info:
+        rgba = img.convert("RGBA")
+        bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        img = Image.alpha_composite(bg, rgba)
+        notes.append("透過部分は白背景に合成した。")
+    return img.convert("RGB"), exif_orient, notes
+
+
+def cmd_init(args):
+    ws = ws_dir(args)
+    ws.mkdir(parents=True, exist_ok=True)
+    img, exif_orient, notes = load_image(args.image)
     img.save(ws / "original.png")
     m = {"original": {"file": "original.png", "source": str(Path(args.image).resolve()), "size": list(img.size)},
          "items": {}, "counters": {}}
@@ -226,6 +255,8 @@ def cmd_init(args):
     print(f"original : {w}x{h} ({w * h / 1e6:.1f}MP)  EXIF orientation={exif_orient or 'なし'}"
           f"{' → 補正済み' if exif_orient and exif_orient != 1 else ''}")
     print(f"overview : {ws / 'overview.png'}  (元画像1px → {s:.2f}px)")
+    for note in notes:
+        print(f"  注意: {note}")
     if 0.75 <= s < 0.999:
         print("  全体表示はほぼ等倍。小さい文字や細い線は crop で拡大すると読みやすくなる。")
     elif s < 0.75:
@@ -317,8 +348,9 @@ def cmd_crop(args):
 
 
 def simple_upscale(img: Image.Image, scale: int) -> Image.Image:
-    """弱いぼかしで JPEG ノイズを抑え、2 倍ずつ Lanczos 拡大して弱くシャープにする。
-    強いフィルタはノイズを強調して逆効果だったので、控えめにしている。"""
+    """ごく弱くぼかしてから、2 倍ずつ Lanczos 拡大して弱くシャープにする。
+    ぼかしは拡大時にドット状のギザつきが強調されるのを和らげる程度で、ノイズ除去ではない
+    (JPEG のブロックノイズは消えない)。強いフィルタはノイズを強調して逆効果だったので控えめにしている。"""
     img = img.filter(ImageFilter.GaussianBlur(0.4))
     while scale > 1:
         img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)

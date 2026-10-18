@@ -24,7 +24,7 @@ description: 画像を一度見て答えるのではなく、切り出し・拡�
 スクリプト: `scripts/vision.py` (Pillow が必要。なければ `pip install pillow`)。以下 `V` はこのスクリプトのパス。
 
 ```bash
-python V init /path/to/image.jpg      # 作業フォルダ ./vision_ws を作成、EXIF の向きも補正
+python V init /path/to/image.jpg      # 作業フォルダ ./vision_ws を作成、EXIF の向きも補正 (PNG/WebP/GIF/BMP/TIFF も可。透過は白背景に合成。HEIC は pillow-heif が必要。PDF/SVG は非対応)
 ```
 
 `init` は元画像のサイズと「全体表示で何分の1に縮小されるか」を表示する。この縮小率が、全体表示を信用してよい細かさの目安になる。
