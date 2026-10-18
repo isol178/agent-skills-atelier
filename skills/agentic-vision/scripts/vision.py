@@ -575,6 +575,11 @@ def cmd_annotate(args):
     emit(ws, m, name, base, meta, s)
     print(f"  描画: 枠 {len(boxes)} 個 + 点 {len(points)} 個 = 計 {k} 個。"
           "印のない対象・二重の印・ずれた印がないか確認すること。")
+    if points:
+        where = "元画像" if args.source == "original" else f"{args.source} 自身"
+        coords = "; ".join(f"{labels[len(boxes) + i] if len(boxes) + i < len(labels) else len(boxes) + i + 1}="
+                           f"({x:.3f},{y:.3f})" for i, (x, y) in enumerate(points))
+        print(f"  点の座標 ({where}の割合): {coords}")
 
 
 def cmd_list(args):
