@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["pillow"]
+# ///
 """Agentic Vision 用の画像加工 CLI (Think -> Act -> Observe の Act 担当)。
 
-Claude が Bash で実行し、出力された PNG を Read で見る (Observe) ために使う。
+エージェントがシェルで実行し、出力された PNG を画像として見る (Observe) ために使う。
 
 座標のルール (重要):
   - 座標はすべて「元画像に対する 0.0〜1.0 の割合」(左上が 0,0)。
@@ -44,7 +48,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 Image.MAX_IMAGE_PIXELS = 300_000_000
 
-# Claude の画像入力は長辺 ~1568px / 約 1.15MP を超えると縮小される。
+# 多くのモデルの画像入力は長辺 ~1568px / 約 1.15MP を超えると縮小される。
 # 出力をこの範囲に収めれば、作った画素がそのままモデルに届く。
 MAX_SIDE = 1568
 MAX_PIXELS = 1_150_000
@@ -219,7 +223,7 @@ def load_image(path: str) -> tuple[Image.Image, int | None, list[str]]:
     except Exception as e:  # noqa: BLE001
         hint = ""
         if Path(path).suffix.lower() in (".heic", ".heif"):
-            hint = " HEIC/HEIF は `pip install pillow-heif` を入れると開ける。"
+            hint = " HEIC/HEIF は pillow-heif を追加で入れると開ける (uv なら `uv run --with pillow-heif ...`)。"
         elif Path(path).suffix.lower() in (".pdf", ".svg"):
             hint = " PDF/SVG は非対応。PNG などに書き出してから渡す。"
         die(f"画像を開けません: {path} ({e}).{hint}")
@@ -386,7 +390,7 @@ def edsr_upscale(img: Image.Image) -> Image.Image:
         import numpy as np
         sr = cv2.dnn_superres.DnnSuperResImpl_create()
     except (ImportError, AttributeError):
-        die("EDSR には opencv-contrib-python が必要です (`pip install opencv-contrib-python`)。"
+        die("EDSR には opencv-contrib-python が必要です (uv なら `uv run --with opencv-contrib-python ...`、それ以外は環境の流儀で追加)。"
             "入れられない場合は --method simple を使ってください。")
     sr.readModel(str(edsr_model_path()))
     sr.setModel("edsr", 4)
