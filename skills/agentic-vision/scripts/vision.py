@@ -14,6 +14,7 @@ Claude が Bash で実行し、出力された PNG を Read で見る (Observe) 
   init      作業フォルダを作り、EXIF の向きを反映した元画像を保存して基本情報を表示
   grid      座標グリッドを重ねる (全体 or --box の範囲)
   crop      範囲を切り出して拡大 (常に元画像の画素から切るので画質が落ちない)
+  upscale   小さい範囲をぼやけを抑えて拡大 (既定は簡易方式、--method edsr で AI 超解像)
   tile      N x M のタイルに分割 (境界の取りこぼしを防ぐため重なりあり)
   adjust    回転 / 反転 / コントラスト / 明るさ / シャープ / 二値化 など
   annotate  枠・点と番号を描く (数え上げや位置の検算用)
@@ -23,6 +24,8 @@ Claude が Bash で実行し、出力された PNG を Read で見る (Observe) 
   python vision.py init photo.jpg
   python vision.py grid --rows 8 --cols 8
   python vision.py crop 0.70 0.85 1.0 1.0
+  python vision.py upscale --box 0.06,0.84,0.15,0.94
+  python vision.py upscale --box 0.06,0.84,0.15,0.94 --method edsr
   python vision.py tile --rows 3 --cols 3
   python vision.py adjust --box 0.1,0.2,0.5,0.6 --rotate 90 --autocontrast --sharpen
   python vision.py annotate --points "0.12,0.30;0.18,0.33" --view 0,0.2,0.5,0.6
@@ -34,6 +37,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.request
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
@@ -46,6 +50,9 @@ MAX_SIDE = 1568
 MAX_PIXELS = 1_150_000
 MIN_SIDE = 900          # 小さな切り出しはこの長辺まで拡大 (最大 MAX_UPSCALE 倍)
 MAX_UPSCALE = 4.0
+EDSR_URL = "https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x4.pb"
+EDSR_MIN_BYTES = 30_000_000   # 約 38MB。途中で切れたダウンロードを弾く
+EDSR_MAX_PIXELS = 100_000     # これより大きい範囲は遅いので断る (約 316x316px)
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
@@ -309,6 +316,77 @@ def cmd_crop(args):
     print(f"  元画像の画素範囲: {pb[2] - pb[0]}x{pb[3] - pb[1]}px")
 
 
+def simple_upscale(img: Image.Image, scale: int) -> Image.Image:
+    """弱いぼかしで JPEG ノイズを抑え、2 倍ずつ Lanczos 拡大して弱くシャープにする。
+    強いフィルタはノイズを強調して逆効果だったので、控えめにしている。"""
+    img = img.filter(ImageFilter.GaussianBlur(0.4))
+    while scale > 1:
+        img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.5, percent=40, threshold=3))
+        scale //= 2
+    return ImageEnhance.Contrast(img).enhance(1.08)
+
+
+def edsr_model_path() -> Path:
+    cache = Path(os.environ.get("VISION_MODEL_DIR", Path.home() / ".cache" / "agentic-vision"))
+    path = cache / "EDSR_x4.pb"
+    if path.exists() and path.stat().st_size >= EDSR_MIN_BYTES:
+        return path
+    cache.mkdir(parents=True, exist_ok=True)
+    print(f"EDSR の重み (約38MB) を取得します: {EDSR_URL}", file=sys.stderr)
+    tmp = path.with_suffix(".part")
+    try:
+        urllib.request.urlretrieve(EDSR_URL, tmp)
+    except Exception as e:
+        tmp.unlink(missing_ok=True)
+        die(f"EDSR の重みを取得できませんでした ({e})。ネットワークを確認するか、"
+            f"EDSR_x4.pb を {cache} に置いてください。簡易方式 (--method simple) は使えます。")
+    if tmp.stat().st_size < EDSR_MIN_BYTES:
+        tmp.unlink(missing_ok=True)
+        die("取得した EDSR の重みのサイズが想定より小さいため破棄しました。再実行してください。")
+    tmp.replace(path)
+    return path
+
+
+def edsr_upscale(img: Image.Image) -> Image.Image:
+    try:
+        import cv2
+        import numpy as np
+        sr = cv2.dnn_superres.DnnSuperResImpl_create()
+    except (ImportError, AttributeError):
+        die("EDSR には opencv-contrib-python が必要です (`pip install opencv-contrib-python`)。"
+            "入れられない場合は --method simple を使ってください。")
+    sr.readModel(str(edsr_model_path()))
+    sr.setModel("edsr", 4)
+    bgr = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    return Image.fromarray(cv2.cvtColor(sr.upsample(bgr), cv2.COLOR_BGR2RGB))
+
+
+def cmd_upscale(args):
+    ws = ws_dir(args)
+    m = load_manifest(ws)
+    img = open_original(ws, m)
+    box = clamp_box(*(parse_box(args.box) or die("--box l,t,r,b を指定してください。")))
+    pb = px_box(img, box)
+    w, h = pb[2] - pb[0], pb[3] - pb[1]
+    if w < 4 or h < 4:
+        die("範囲が小さすぎます (4px 未満)。範囲を広げてください。")
+    crop = img.crop(pb)
+    if args.method == "edsr":
+        if w * h > EDSR_MAX_PIXELS:
+            die(f"範囲が大きすぎます ({w}x{h}px)。EDSR は遅いので約 316x316px 以下に絞ってください。")
+        out = edsr_upscale(crop)
+    else:
+        out = simple_upscale(crop, args.scale)
+    out, _ = fit(out, upscale=False)
+    name = next_name(m, "upscale")
+    meta = {"kind": "upscale", "mappable": True, "parent": "original", "box": list(box), "method": args.method}
+    emit(ws, m, name, out, meta, out.width / w)
+    print(f"  元画像の画素範囲: {w}x{h}px  方式: {args.method}")
+    print("  注意: 補間・超解像は元画像にない細部を作らない (EDSR は推定で描き足す)。"
+          "位置や形の確認に使い、文字の読み取りの根拠にはしない。")
+
+
 def cmd_tile(args):
     ws = ws_dir(args)
     m = load_manifest(ws)
@@ -498,6 +576,13 @@ def main():
     p.add_argument("--pad", type=float, default=0.0, help="範囲を各辺この割合だけ広げる (例 0.1)")
     p.add_argument("--px-of", help="座標を、この出力画像 (crop_1.png など) 上の画素位置として解釈する")
     p.set_defaults(func=cmd_crop)
+
+    p = sub.add_parser("upscale", help="小さい範囲をぼやけを抑えて拡大")
+    p.add_argument("--box", required=True, help="拡大する範囲 (元画像座標 l,t,r,b)")
+    p.add_argument("--method", choices=["simple", "edsr"], default="simple",
+                   help="simple: 簡易方式 (既定)。edsr: AI 超解像 4 倍 (opencv-contrib-python が必要、初回に重みを取得)")
+    p.add_argument("--scale", type=int, choices=[2, 4], default=4, help="simple の倍率 (edsr は 4 倍固定)")
+    p.set_defaults(func=cmd_upscale)
 
     p = sub.add_parser("tile", help="タイル分割")
     p.add_argument("--rows", type=int, default=2)

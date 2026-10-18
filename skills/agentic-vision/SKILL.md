@@ -41,11 +41,14 @@ overview.png (または会話中の画像) を見て、答えに必要な細部�
 |---|---|
 | どこを切るか座標を知りたい | `python V grid --rows 8 --cols 8` (範囲を絞るなら `--box l,t,r,b`) |
 | 細部を読む | `python V crop l t r b` (`--pad 0.1` で少し余白) |
+| 小さい範囲をぼやけを抑えて拡大 | `python V upscale --box l,t,r,b` (既定は簡易方式。それでも解釈が難しいときだけ `--method edsr`) |
 | 密集・広範囲を漏れなく見る | `python V tile --rows 3 --cols 3` (`--box` で範囲限定) |
 | 傾き・上下逆・暗い・かすれ | `python V adjust --box l,t,r,b --rotate 180 --autocontrast --sharpen` |
 | 数えた結果・位置の検算 | `python V annotate --points "x,y;x,y;..."` (`--view` で範囲表示) |
 
 座標は **すべて元画像に対する 0.0〜1.0 の割合** (左上が 0,0)。crop や tile の出力にグリッドを重ねてもラベルは元画像座標で出るので、見えた値をそのまま次の crop に渡せばよい。crop は常に元画像の画素から切り出すので、切り出しを重ねても画質は落ちない。
+
+**upscale の使い分け**: crop は元画像の画素をそのまま拡大するだけなので、数十px 角の小さい対象は輪郭がにじむ。そういうときは `upscale` を使う。既定の簡易方式 (弱いぼかし → 段階的な Lanczos 拡大 → 弱いシャープ) で足りないときに限り `--method edsr` (AI 超解像 4倍) を補助に使う。EDSR は `opencv-contrib-python` が必要で、初回に重み (約38MB) を `~/.cache/agentic-vision/` へ取得する。範囲は約 316x316px 以下に絞ること。どちらも元画像にない情報は作れず、EDSR は推定で描き足すので、**位置や形の確認にだけ使い、文字や数値を読む根拠にしない** (読めないものは「判読不能」のまま)。
 
 見ている画像の上で位置を指したいときは、割合に換算せず `--px-of 画像名` を付けてその画像の画素座標で渡せる (crop と annotate)。例: `python V annotate --px-of tile_4.png --points "385,229;593,246"`。暗算での換算ミスがなくなるので、数え上げの検算ではこちらを使う。
 
