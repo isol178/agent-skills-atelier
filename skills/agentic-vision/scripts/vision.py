@@ -54,6 +54,7 @@ MAX_SIDE = 1568
 MAX_PIXELS = 1_150_000
 MIN_SIDE = 900          # 小さな切り出しはこの長辺まで拡大 (最大 MAX_UPSCALE 倍)
 MAX_UPSCALE = 4.0
+MAX_TILES_PER_SIDE = 16  # 誤指定で大量のファイルを作らないための上限 (16x16 = 256 枚)
 EDSR_URL = "https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x4.pb"
 EDSR_MIN_BYTES = 30_000_000   # 約 38MB。途中で切れたダウンロードを弾く
 EDSR_MAX_PIXELS = 100_000     # これより大きい範囲は遅いので断る (約 316x316px)
@@ -125,6 +126,14 @@ def px_box(img: Image.Image, box) -> tuple[int, int, int, int]:
     return (round(l * img.width), round(t * img.height), round(r * img.width), round(b * img.height))
 
 
+def require_size(img: Image.Image, box, what: str = "範囲") -> tuple[int, int, int, int]:
+    """box の画素範囲を返す。幅か高さが 4px 未満なら終了する (幅ゼロでの 0 除算を防ぐ)。"""
+    pb = px_box(img, box)
+    if pb[2] - pb[0] < 4 or pb[3] - pb[1] < 4:
+        die(f"{what}が小さすぎます (4px 未満): {fmt_box(box)}。範囲を広げてください。")
+    return pb
+
+
 def fit(img: Image.Image, upscale: bool = True) -> tuple[Image.Image, float]:
     """モデルに縮小されない大きさに収める。小さい切り出しは拡大する。倍率も返す。"""
     w, h = img.size
@@ -191,7 +200,9 @@ def fmt_box(b) -> str:
 
 
 def outlined(d: ImageDraw.ImageDraw, xy, text, fnt, fill=(255, 255, 0)):
-    d.text(xy, text, fill=fill, font=fnt, stroke_width=max(2, fnt.size // 8), stroke_fill=(0, 0, 0))
+    # 古い Pillow の load_default() はビットマップフォントで .size を持たない
+    size = getattr(fnt, "size", 11)
+    d.text(xy, text, fill=fill, font=fnt, stroke_width=max(2, size // 8), stroke_fill=(0, 0, 0))
 
 
 def nice_step(span: float, n: int) -> float:
@@ -204,7 +215,9 @@ def nice_step(span: float, n: int) -> float:
 
 
 def label_fmt(step: float) -> str:
-    return "{:.3f}" if step < 0.01 else "{:.2f}"
+    """刻み幅を正確に表せる桁数の書式 (0.125 → 3 桁、0.0025 → 4 桁)。"""
+    d = next((d for d in range(2, 6) if abs(round(step, d) - step) < 1e-9), 6)
+    return f"{{:.{d}f}}"
 
 
 # ------------------------------------------------------------------ コマンド
@@ -235,6 +248,17 @@ def load_image(path: str) -> tuple[Image.Image, int | None, list[str]]:
     if getattr(src, "n_frames", 1) > 1:
         notes.append(f"{src.n_frames} フレームのアニメーションなので最初のフレームだけを使う。")
     img = ImageOps.exif_transpose(src)
+    if img.mode.startswith("I") or img.mode == "F":
+        # 16bit/32bit/浮動小数の画像は convert("RGB") だと 255 超が切り詰められて真っ白になる
+        img = img.convert("F") if img.mode == "F" else img.convert("I")
+        lo, hi = img.getextrema()
+        if img.mode == "F" and 0 <= lo and hi <= 1.0:
+            lo, hi = 0.0, 1.0  # 0〜1 の浮動小数画像は絶対値のまま 0〜255 にする
+        if lo < 0 or hi > 255 or img.mode == "F":
+            k = 255.0 / (hi - lo) if hi > lo else 0.0
+            img = img.point(lambda p: (p - lo) * k)
+            notes.append(f"{src.mode} の画像を 8bit に変換した (値 {lo:g}〜{hi:g} を 0〜255 に伸長)。")
+        img = img.convert("L")
     if "A" in img.getbands() or "transparency" in img.info:
         rgba = img.convert("RGBA")
         bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
@@ -278,7 +302,7 @@ def cmd_grid(args):
     img, mappable = resolve_source(ws, m, args.source)
     box = parse_box(args.box) or (tuple(m["items"][args.source]["box"])
                                  if mappable and args.source in m["items"] else (0, 0, 1, 1))
-    view = img.crop(px_box(img, box))
+    view = img.crop(require_size(img, box))
     view, s = fit(view)
     w, h = view.size
     l, t, r, b = box
@@ -330,11 +354,11 @@ def cmd_crop(args):
     img, mappable = resolve_source(ws, m, args.source)
     vals = [args.left, args.top, args.right, args.bottom]
     if args.px_of:
+        if not mappable:
+            die(f"--px-of は元画像座標を返すので、元画像と対応しない --source {args.source} とは併用できません。")
         vals = px_to_global(m, args.px_of, vals)
     box = clamp_box(*vals)
-    pb = px_box(img, box)
-    if pb[2] - pb[0] < 4 or pb[3] - pb[1] < 4:
-        die("切り出し範囲が小さすぎます (4px 未満)。範囲を広げてください。")
+    pb = require_size(img, box, "切り出し範囲")
     if args.pad:
         pw, ph = (pb[2] - pb[0]) * args.pad, (pb[3] - pb[1]) * args.pad
         box = clamp_box(box[0] - pw / img.width, box[1] - ph / img.height,
@@ -403,17 +427,23 @@ def cmd_upscale(args):
     m = load_manifest(ws)
     img = open_original(ws, m)
     box = clamp_box(*(parse_box(args.box) or die("--box l,t,r,b を指定してください。")))
-    pb = px_box(img, box)
+    pb = require_size(img, box)
     w, h = pb[2] - pb[0], pb[3] - pb[1]
-    if w < 4 or h < 4:
-        die("範囲が小さすぎます (4px 未満)。範囲を広げてください。")
     crop = img.crop(pb)
     if args.method == "edsr":
         if w * h > EDSR_MAX_PIXELS:
             die(f"範囲が大きすぎます ({w}x{h}px)。EDSR は遅いので約 316x316px 以下に絞ってください。")
         out = edsr_upscale(crop)
     else:
-        out = simple_upscale(crop, args.scale)
+        # 拡大後に fit で縮められる大きさまで拡大しても無駄で、大きな範囲ではメモリも使い切る
+        scale = args.scale
+        while scale > 1 and (max(w, h) * scale > MAX_SIDE or w * h * scale * scale > MAX_PIXELS):
+            scale //= 2
+        if scale < 2:
+            die(f"範囲が大きすぎます ({w}x{h}px)。upscale は小さい範囲向けなので、crop を使うか範囲を絞ってください。")
+        if scale != args.scale:
+            print(f"  出力が大きくなりすぎるので倍率を {args.scale} → {scale} に下げた。")
+        out = simple_upscale(crop, scale)
     out, _ = fit(out, upscale=False)
     name = next_name(m, "upscale")
     meta = {"kind": "upscale", "mappable": True, "parent": "original", "box": list(box), "method": args.method}
@@ -428,9 +458,13 @@ def cmd_tile(args):
     m = load_manifest(ws)
     img = open_original(ws, m)
     l, t, r, b = parse_box(args.box) or (0, 0, 1, 1)
-    rows, cols = max(1, min(args.rows, 8)), max(1, min(args.cols, 8))
+    rows, cols = (max(1, min(n, MAX_TILES_PER_SIDE)) for n in (args.rows, args.cols))
+    if (rows, cols) != (args.rows, args.cols):
+        print(f"  警告: 分割数を {args.rows}x{args.cols} → {rows}x{cols} に制限した (1〜{MAX_TILES_PER_SIDE})。"
+              "1 タイルあたりの対象が想定より多くなるので、--box で範囲を分けて tile し直す。", file=sys.stderr)
     ov = max(0.0, min(args.overlap, 0.5))
     cw, ch = (r - l) / cols, (b - t) / rows
+    require_size(img, (l, t, l + cw, t + ch), "1 タイルあたりの範囲")
     print(f"tiles ({rows}x{cols}, overlap={ov:.0%})")
     if ov > 0 and not args.no_frame:
         print("  各タイルの水色の枠が担当範囲。数えるときは「中心が枠の内側にある対象」だけ数えれば、"
@@ -464,7 +498,7 @@ def cmd_adjust(args):
     if box is None and mappable and args.source in m["items"]:
         box = tuple(m["items"][args.source]["box"])
     if box:
-        img = img.crop(px_box(img, box))
+        img = img.crop(require_size(img, box))
     # 拡大は加工前に行う (二値化・シャープ化は拡大後の方が効く)
     img, s = fit(img)
     ops = []
@@ -530,16 +564,17 @@ def cmd_annotate(args):
     boxes = parse_list(args.boxes, 4, "box")
     points = parse_list(args.points, 2, "point")
     if args.px_of:
+        if not mappable:
+            die(f"--px-of は元画像座標を返すので、元画像と対応しない --source {args.source} とは併用できません。")
         boxes = [px_to_global(m, args.px_of, bx) for bx in boxes]
         points = [px_to_global(m, args.px_of, pt) for pt in points]
-        if not args.view:
-            args.view = fmt_box(m["items"][args.px_of]["box"])
     if not boxes and not points:
         die("--boxes か --points を指定してください。")
     labels = [x.strip() for x in args.labels.split(";")] if args.labels else []
-    view = parse_box(args.view) or (0, 0, 1, 1)
+    # --px-of の既定の表示範囲は丸めずに使う (文字列経由で丸めると印が数 px ずれる)
+    view = parse_box(args.view) or (tuple(m["items"][args.px_of]["box"]) if args.px_of else (0, 0, 1, 1))
     vl, vt, vr, vb = view
-    base = img.crop(px_box(img, view))
+    base = img.crop(require_size(img, view, "--view の範囲"))
     base, s = fit(base)
     w, h = base.size
     d = ImageDraw.Draw(base, "RGBA")
@@ -576,7 +611,7 @@ def cmd_annotate(args):
     print(f"  描画: 枠 {len(boxes)} 個 + 点 {len(points)} 個 = 計 {k} 個。"
           "印のない対象・二重の印・ずれた印がないか確認すること。")
     if points:
-        where = "元画像" if args.source == "original" else f"{args.source} 自身"
+        where = "元画像" if mappable else f"{args.source} 自身"
         coords = "; ".join(f"{labels[len(boxes) + i] if len(boxes) + i < len(labels) else len(boxes) + i + 1}="
                            f"({x:.3f},{y:.3f})" for i, (x, y) in enumerate(points))
         print(f"  点の座標 ({where}の割合): {coords}")
@@ -626,8 +661,8 @@ def main():
     p.set_defaults(func=cmd_upscale)
 
     p = sub.add_parser("tile", help="タイル分割")
-    p.add_argument("--rows", type=int, default=2)
-    p.add_argument("--cols", type=int, default=2)
+    p.add_argument("--rows", type=int, default=2, help=f"行数 (1〜{MAX_TILES_PER_SIDE}。超えると上限に切り詰めて警告)")
+    p.add_argument("--cols", type=int, default=2, help=f"列数 (1〜{MAX_TILES_PER_SIDE}。超えると上限に切り詰めて警告)")
     p.add_argument("--overlap", type=float, default=0.1)
     p.add_argument("--box", help="この範囲だけをタイル分割 (元画像座標)")
     p.add_argument("--no-frame", action="store_true", help="担当範囲の水色枠を描かない (文字読み取り時など)")
