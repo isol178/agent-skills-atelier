@@ -7,6 +7,9 @@ see which side moved last, whether it moved alone, and which commits to read.
 Usage:
     python trace_divergence.py [options] ANCHOR ANCHOR [ANCHOR ...]
 
+Put the two conflicting claims first; witnesses (tests, callers) go after them.
+"Read first" is built from the first two anchors only.
+
 ANCHOR forms (the LABEL= prefix is optional; labels default to A, B, C, ...):
     doc=docs/api.md:120-135        line range at REV          (git log -L)
     code=src/users.py::get_user    function by name at REV    (git log -L :NAME:PATH)
@@ -26,8 +29,9 @@ Options:
     --limit N                      show only the newest N timeline rows (default: 60)
 
 Line numbers are interpreted against REV, not the working tree. Commits listed
-in .git-blame-ignore-revs or touching >= --mass files are shown but not used as
-the commit that "wrote" an anchor's current text.
+in .git-blame-ignore-revs, touching >= --mass files, or whose subject says they
+only reformat (style:, black, prettier, ...) are shown but not used as the
+commit that "wrote" an anchor's current text.
 Only the Python standard library and the git CLI are required.
 
 Exit codes:
@@ -54,6 +58,13 @@ NON_BEHAVIORAL = re.compile(
     r"\b(refactor\w*|format\w*|reformat\w*|lint\w*|prettier|black|isort|ruff|"
     r"style|rename\w*|move[sd]?|cleanup|clean[ -]up|chore|typo\w*|tidy|"
     r"bump|upgrade|migrate to|no[ -]behaviou?r[ -]change|nfc)\b",
+    re.IGNORECASE,
+)
+# Narrower than NON_BEHAVIORAL: commits that only reformat. Skipped when
+# deciding which commit "wrote" an anchor's current text (refactors are not).
+FORMAT_ONLY = re.compile(
+    r"^style\b|\b(format\w*|reformat\w*|black|prettier|isort|gofmt|rustfmt|"
+    r"whitespace|indent\w*|lint fix\w*)\b",
     re.IGNORECASE,
 )
 REVERT = re.compile(r"^revert\b", re.IGNORECASE)
@@ -246,12 +257,23 @@ def is_sweep(c: Commit, mass: int, ignored: set[str]) -> bool:
     return len(c.files) >= mass or any(c.sha.startswith(r) for r in ignored)
 
 
-def written_in(a: Anchor, commits: dict[str, Commit], mass: int, ignored: set[str]) -> Commit:
-    """Newest commit that changed the anchor's meaning, skipping formatting sweeps."""
+def formatting_only(c: Commit, mass: int, ignored: set[str]) -> bool:
+    return is_sweep(c, mass, ignored) or bool(FORMAT_ONLY.search(c.subject))
+
+
+def written_in(
+    a: Anchor, commits: dict[str, Commit], mass: int, ignored: set[str]
+) -> tuple[Commit, list[Commit]]:
+    """Newest commit that changed the anchor's meaning, and the formatting-only
+    or sweep commits skipped to find it."""
+    skipped = []
     for sha in a.shas:
-        if not is_sweep(commits[sha], mass, ignored):
-            return commits[sha]
-    return commits[a.shas[0]]
+        c = commits[sha]
+        if formatting_only(c, mass, ignored):
+            skipped.append(c)
+            continue
+        return c, skipped
+    return commits[a.shas[0]], []
 
 
 def mark(a: Anchor, c: Commit) -> str:
@@ -351,10 +373,10 @@ def main() -> int:
         if a.shas:
             last = commits[a.shas[0]]
             first = commits[a.shas[-1]]
-            meaningful = written_in(a, commits, args.mass, ignored)
+            meaningful, _ = written_in(a, commits, args.mass, ignored)
             info = f"{len(a.shas)} commits; last changed {last.short} ({last.date})"
             if meaningful is not last:
-                info += f", last non-sweep change {meaningful.short} ({meaningful.date})"
+                info += f", last non-formatting change {meaningful.short} ({meaningful.date})"
             info += f"; history starts {first.short} ({first.date})"
         else:
             info = "no commits"
@@ -391,6 +413,7 @@ def main() -> int:
     for x, y in itertools.combinations(anchors, 2):
         if not x.shas or not y.shas:
             continue
+        primary = x is anchors[0] and y is anchors[1]
         both = [c for c in timeline if c.sha in x.shas and c.sha in y.shas]
         if both:
             start_at = both[-1]
@@ -404,14 +427,15 @@ def main() -> int:
             start_at = commits[newer.shas[-1]]
             print(f"  {x.label} <-> {y.label}: never changed together; {older.label} existed first, "
                   f"{newer.label} appeared in {start_at.short} ({start_at.date}) {start_at.subject}")
-            if not is_sweep(start_at, args.mass, ignored):
+            if primary and not formatting_only(start_at, args.mass, ignored):
                 to_read.append(start_at)
             label = f"since {newer.label} appeared"
         after = timeline[pos[start_at.sha] + 1:]
         for side, other in ((x, y), (y, x)):
             alone = [c for c in after if c.sha in side.shas and c.sha not in other.shas]
             print(f"    only {side.label} moved {label}: {ids(alone)}")
-            to_read.extend(c for c in alone if not is_sweep(c, args.mass, ignored))
+            if primary:
+                to_read.extend(c for c in alone if not formatting_only(c, args.mass, ignored))
 
     print("\nTrue-when-written checks (each anchor's current text vs. the others "
           "as they were when that text was written):")
@@ -419,7 +443,7 @@ def main() -> int:
     for a in anchors:
         if not a.shas or not a.path:
             continue
-        written = written_in(a, commits, args.mass, ignored)
+        written, skipped = written_in(a, commits, args.mass, ignored)
         targets: dict[str, list[str]] = {}
         missing: list[str] = []
         for b in anchors:
@@ -433,7 +457,10 @@ def main() -> int:
         if not targets and not missing:
             continue
         any_check = True
-        print(f"  {a.label} written in {written.short} ({written.date}):")
+        note = ""
+        if skipped:
+            note = " [skipped formatting-only: " + ", ".join(c.short for c in skipped) + "]"
+        print(f"  {a.label} written in {written.short} ({written.date}){note}:")
         for name, labels in targets.items():
             print(f"    {', '.join(labels)}: git show {written.short}:{name}")
         if missing:
@@ -443,8 +470,8 @@ def main() -> int:
 
     if to_read:
         uniq = sorted({c.sha: c for c in to_read}.values(), key=lambda c: pos[c.sha])[-6:]
-        print("\nRead first (where the divergence can have started, oldest -> newest; "
-              "formatting sweeps omitted):")
+        print(f"\nRead first ({anchors[0].label} <-> {anchors[1].label}: where the divergence "
+              "can have started, oldest -> newest; formatting-only commits omitted):")
         for c in uniq:
             print(f"  git show {c.short}    # {c.date} {c.author}: {c.subject}")
     return 0
