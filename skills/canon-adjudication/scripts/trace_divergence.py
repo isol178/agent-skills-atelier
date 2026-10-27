@@ -366,8 +366,8 @@ def main() -> int:
             print(f"  ! {w}")
 
     rows = timeline[-args.limit:] if args.limit > 0 else timeline
-    print("\nTimeline (oldest -> newest). X = changed the anchor, "
-          "f = changed the anchor's file elsewhere, . = untouched")
+    print("\nTimeline (oldest -> newest; only commits that changed at least one anchor). "
+          "X = changed the anchor, f = changed the anchor's file elsewhere, . = untouched")
     if len(rows) < len(timeline):
         print(f"  ... {len(timeline) - len(rows)} older commits hidden (use --limit 0)")
     cols = "  ".join(f"{a.label:^{max(len(a.label), 1)}}" for a in anchors)
